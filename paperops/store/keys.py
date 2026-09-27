@@ -35,6 +35,16 @@ VERSION_PREFIX = "version/"
 CONFIRMATION_PREFIX = "confirmation/"
 ARTIFACT_PREFIX = "artifact/"
 BATCH_PREFIX = "batch/"
+LEDGER_PREFIX = "ledger/revision/"
+DERIVATION_PREFIX = "ledger/derivation/"
+
+
+def ledger_revision_key(name: str) -> str:
+    return LEDGER_PREFIX + name
+
+
+def ledger_derivation_key(name: str, derivation_id: str) -> str:
+    return f"{DERIVATION_PREFIX}{name}/{derivation_id}"
 
 
 def version_key(name: str) -> str:

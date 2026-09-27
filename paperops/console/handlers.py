@@ -85,6 +85,57 @@ def confirmations(console: Any, request: Request) -> Response:
     )
 
 
+def ledger_names(console: Any, request: Request) -> Response:
+    ledger = console.services.ledger
+    return json_response(
+        {
+            "names": list(ledger.names()),
+            "current": {
+                name: (
+                    ledger.current(name).to_row() if ledger.current(name) else None
+                )
+                for name in ledger.names()
+            },
+        }
+    )
+
+
+def ledger_revisions(console: Any, request: Request) -> Response:
+    name = request.param("name", "") or ""
+    revisions = console.services.ledger.revisions(name)
+    return json_response(
+        {
+            "name": name,
+            "count": len(revisions),
+            "revisions": [revision.to_row() for revision in revisions],
+        }
+    )
+
+
+def ledger_current(console: Any, request: Request) -> Response:
+    name = request.param("name", "") or ""
+    revision = console.services.ledger.current(name)
+    return json_response(revision.to_row() if revision else None)
+
+
+def ledger_impact(console: Any, request: Request) -> Response:
+    name = request.param("name", "") or ""
+    sequence = request.integer("sequence", 0)
+    return json_response(console.services.ledger.impact(name, sequence).to_dict())
+
+
+def ledger_verify(console: Any, request: Request) -> Response:
+    return json_response(console.services.ledger.verify())
+
+
+def ledger_derivations(console: Any, request: Request) -> Response:
+    name = request.param("name")
+    entries = console.services.ledger.derivations.list(name)
+    return json_response(
+        {"name": name, "count": len(entries), "derivations": [item.to_row() for item in entries]}
+    )
+
+
 def batches(console: Any, request: Request) -> Response:
     registry = console.services.batches
     return json_response(

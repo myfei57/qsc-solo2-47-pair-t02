@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>代际账</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #0f1720; color: #dfe7ef; }
+    h1 { font-size: 20px; margin: 0 0 16px; }
+    nav a { color: #7fc4ff; margin-right: 14px; text-decoration: none; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 10px; }
+    th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #26333f; vertical-align: top; }
+    th { color: #9fb3c8; font-weight: 600; }
+    select, input, textarea, button { background: #18222e; color: #dfe7ef; border: 1px solid #2f4150; border-radius: 5px; padding: 6px 8px; font-size: 13px; }
+    button { cursor: pointer; }
+    button:hover { border-color: #4a7499; }
+    .row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-top: 14px; }
+    .panel { background: #18222e; border: 1px solid #26333f; border-radius: 8px; padding: 14px; flex: 1; min-width: 360px; }
+    .panel h2 { font-size: 14px; margin: 0 0 10px; color: #9fb3c8; }
+    label { display: block; font-size: 12px; color: #9fb3c8; margin: 8px 0 3px; }
+    .tag { font-size: 11px; padding: 1px 7px; border-radius: 10px; background: #26415a; color: #9fd0ff; }
+    .tag.revert { background: #4a2f3a; color: #ffb0c4; }
+    .tag.voided { background: #4a3a26; color: #ffcf9f; }
+    .tag.ok { background: #214435; color: #8be0b0; }
+    pre { background: #101a24; padding: 10px; border-radius: 6px; overflow: auto; font-size: 12px; }
+    #message { font-size: 13px; margin-top: 8px; min-height: 18px; }
+    .err { color: #ff8c8c; }
+    .hint { color: #7d93a8; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>代际账 · 工艺参数版本谱系</h1>
+  <nav>
+    <a href="/">总览</a>
+    <a href="/operations.html">操作</a>
+    <a href="/curves.html">曲线</a>
+    <a href="/ledger.html">代际账</a>
+    <a href="/audit.html">记录</a>
+  </nav>
+
+  <div class="row">
+    <div class="panel">
+      <h2>参数</h2>
+      <select id="names" size="10" style="width:100%"></select>
+      <div id="verify" style="margin-top:10px"></div>
+    </div>
+
+    <div class="panel">
+      <h2>新版本（改自哪一版、为什么改）</h2>
+      <label>参数名</label><input id="pub-name" style="width:96%">
+      <label>参数值（JSON 对象）</label>
+      <textarea id="pub-values" rows="3" style="width:96%">{"temp": 120, "speed": 900}</textarea>
+      <label>改动原因</label><input id="pub-reason" style="width:96%" placeholder="例如：纸面起泡，提高烘缸温度">
+      <label>操作人</label><input id="pub-operator" style="width:96%" value="班长">
+      <label>基于版本（留空 = 当前生效版）</label><input id="pub-based" style="width:96%" placeholder="自动取当前版">
+      <div style="margin-top:10px"><button onclick="publish()">记新版本</button></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px">
+    <h2>版本谱系（只追加，不可改）</h2>
+    <table id="revisions">
+      <thead><tr><th>版本</th><th>类型</th><th>改自</th><th>参数值</th><th>原因</th><th>操作人</th><th>tick</th><th>摘要</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="row">
+    <div class="panel">
+      <h2>退回旧版 · 先清点作废</h2>
+      <div class="hint">先选要退回的版本，系统列出将随之作废的生成物和未用确认；凭清单摘要确认后才允许退回。</div>
+      <label>目标版本</label><input id="rev-target" style="width:96%">
+      <div style="margin-top:8px"><button onclick="previewImpact()">清点作废清单</button></div>
+      <pre id="impact" style="min-height:60px"></pre>
+      <label>退回原因</label><input id="rev-reason" style="width:96%" placeholder="例如：新配方跑不出来，退回上一版">
+      <label>操作人</label><input id="rev-operator" style="width:96%" value="班长">
+      <div style="margin-top:10px"><button onclick="revert()">凭摘要确认并退回</button></div>
+    </div>
+
+    <div class="panel">
+      <h2>已生成的东西</h2>
+      <div class="hint">在某一版下产生的工单、曲线、配方单等；版本一变即随作废清单列出。</div>
+      <table id="derivations">
+        <thead><tr><th>编号</th><th>类型</th><th>来源版</th><th>说明</th><th>状态</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <h2 style="margin-top:14px">登记一个生成物（挂到当前版）</h2>
+      <label>类型</label><input id="drv-kind" style="width:96%" value="work-order">
+      <label>说明</label><input id="drv-detail" style="width:96%" value="第 3 号线当日工单">
+      <div style="margin-top:8px"><button onclick="derive()">登记生成物</button></div>
+    </div>
+  </div>
+
+  <div id="message"></div>
+
+  <script>
+    const api = async (path, options) => {
+      const response = await fetch(path, options);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || ("HTTP " + response.status));
+      return body;
+    };
+    const say = (text, isErr) => {
+      const node = document.getElementById("message");
+      node.className = isErr ? "err" : "tag ok";
+      node.textContent = text;
+    };
+    let ackDigest = "";
+
+    async function refreshNames() {
+      const data = await api("/api/ledger/names");
+      const select = document.getElementById("names");
+      const previous = select.value;
+      select.innerHTML = "";
+      for (const name of data.names) {
+        const option = document.createElement("option");
+        option.textContent = name;
+        select.appendChild(option);
+      }
+      if (previous && data.names.includes(previous)) select.value = previous;
+      if (select.value) await refreshAll(select.value);
+    }
+
+    async function refreshAll(name) {
+      document.getElementById("pub-name").value = name;
+      const [revisions, derivations, verify] = await Promise.all([
+        api("/api/ledger/revisions?name=" + encodeURIComponent(name)),
+        api("/api/ledger/derivations?name=" + encodeURIComponent(name)),
+        api("/api/ledger/verify"),
+      ]);
+      const body = document.querySelector("#revisions tbody");
+      body.innerHTML = "";
+      for (const r of revisions.revisions) {
+        const tr = document.createElement("tr");
+        const tag = r.kind === "revert"
+          ? `<span class="tag revert">退回→${r.reverted_sequence}</span>`
+          : `<span class="tag">改动</span>`;
+        tr.innerHTML =
+          `<td>#${r.sequence}</td><td>${tag}</td><td>#${r.based_on}</td>` +
+          `<td><pre>${JSON.stringify(r.values)}</pre></td><td>${r.reason}</td>` +
+          `<td>${r.operator}</td><td>${r.tick}</td>` +
+          `<td title="${r.digest}">${r.digest.slice(0, 10)}…</td>` +
+          `<td><button onclick="useForRevert('${name}', ${r.sequence})">退回</button></td>`;
+        body.appendChild(tr);
+      }
+      const dbody = document.querySelector("#derivations tbody");
+      dbody.innerHTML = "";
+      for (const d of derivations.derivations) {
+        const tr = document.createElement("tr");
+        const state = d.voided_sequence > 0
+          ? `<span class="tag voided">已作废@#${d.voided_sequence}</span>`
+          : `<span class="tag ok">有效</span>`;
+        tr.innerHTML =
+          `<td>${d.derivation_id}</td><td>${d.kind}</td><td>#${d.sequence}</td>` +
+          `<td>${d.detail || ""}<br><span class="hint">${d.voided_reason || ""}</span></td><td>${state}</td>`;
+        dbody.appendChild(tr);
+      }
+      const verifyNode = document.getElementById("verify");
+      verifyNode.innerHTML = verify.ok
+        ? `<span class="tag ok">历史完整：${verify.parameters} 个参数 / ${verify.revisions} 版</span>`
+        : `<span class="tag revert">历史被改动！</span><pre>${JSON.stringify(verify.errors, null, 2)}</pre>`;
+    }
+
+    function useForRevert(name, sequence) {
+      document.getElementById("rev-target").value = sequence;
+    }
+
+    async function publish() {
+      try {
+        const values = JSON.parse(document.getElementById("pub-values").value);
+        const basedRaw = document.getElementById("pub-based").value.trim();
+        await api("/api/ledger/publish", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            name: document.getElementById("pub-name").value.trim(),
+            values,
+            reason: document.getElementById("pub-reason").value,
+            operator: document.getElementById("pub-operator").value,
+            based_on: basedRaw === "" ? null : Number(basedRaw),
+          }),
+        });
+        say("新版本已入账", false);
+        await refreshNames();
+      } catch (error) { say(String(error), true); }
+    }
+
+    async function previewImpact() {
+      try {
+        const name = document.getElementById("names").value;
+        const sequence = Number(document.getElementById("rev-target").value);
+        const report = await api(
+          `/api/ledger/impact?name=${encodeURIComponent(name)}&sequence=${sequence}`
+        );
+        ackDigest = report.digest;
+        document.getElementById("impact").textContent = JSON.stringify(report, null, 2);
+        say(`作废清单已生成，摘要 ${report.digest.slice(0, 10)}…`, false);
+      } catch (error) { say(String(error), true); }
+    }
+
+    async function revert() {
+      try {
+        const name = document.getElementById("names").value;
+        const sequence = Number(document.getElementById("rev-target").value);
+        await api("/api/ledger/revert", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            name,
+            sequence,
+            reason: document.getElementById("rev-reason").value,
+            operator: document.getElementById("rev-operator").value,
+            ack: ackDigest,
+          }),
+        });
+        ackDigest = "";
+        document.getElementById("impact").textContent = "";
+        say(`已退回为新版（沿用第 ${sequence} 版参数）`, false);
+        await refreshNames();
+      } catch (error) { say(String(error), true); }
+    }
+
+    async function derive() {
+      try {
+        const name = document.getElementById("names").value;
+        await api("/api/ledger/derive", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            name,
+            kind: document.getElementById("drv-kind").value,
+            detail: document.getElementById("drv-detail").value,
+          }),
+        });
+        say("生成物已登记到当前版", false);
+        await refreshNames();
+      } catch (error) { say(String(error), true); }
+    }
+
+    document.getElementById("names").addEventListener("change", (event) => refreshAll(event.target.value));
+    refreshNames();
+    setInterval(refreshNames, 5000);
+  </script>
+</body>
+</html>

@@ -11,15 +11,19 @@ from ..errors import (
     DuplicateStageError,
     LatchClearError,
     LatchSetError,
+    LedgerTamperedError,
     MaintenanceError,
     OutOfRangeError,
     OutOfSequenceError,
     PreGateError,
+    RevisionConflictError,
+    RevertAckMismatchError,
     RollbackError,
     StaleArtifactError,
     UnknownBatchError,
     UnknownConfirmationError,
     UnknownKeyError,
+    UnknownRevisionError,
     UnknownSensorError,
     UnknownStageError,
 )
@@ -39,6 +43,7 @@ CONFLICT = (
     StaleArtifactError,
     RollbackError,
     CommitOrderError,
+    RevisionConflictError,
 )
 MALFORMED = (OutOfRangeError, UnknownStageError, ConfirmationMismatchError)
 MISSING = (
@@ -47,6 +52,7 @@ MISSING = (
     UnknownBatchError,
     BatchNotPendingError,
     UnknownSensorError,
+    UnknownRevisionError,
 )
 
 ROUTES: tuple[tuple[str, str, Handler], ...] = (
@@ -73,6 +79,15 @@ ROUTES: tuple[tuple[str, str, Handler], ...] = (
     ("POST", "/api/journal/maintenance", operations.journal_maintenance),
     ("POST", "/api/clock/advance", operations.journal_advance_tick),
     ("POST", "/api/confirmation", operations.confirmation_issue),
+    ("GET", "/api/ledger/names", handlers.ledger_names),
+    ("GET", "/api/ledger/revisions", handlers.ledger_revisions),
+    ("GET", "/api/ledger/current", handlers.ledger_current),
+    ("GET", "/api/ledger/impact", handlers.ledger_impact),
+    ("GET", "/api/ledger/verify", handlers.ledger_verify),
+    ("GET", "/api/ledger/derivations", handlers.ledger_derivations),
+    ("POST", "/api/ledger/publish", operations.ledger_publish),
+    ("POST", "/api/ledger/revert", operations.ledger_revert),
+    ("POST", "/api/ledger/derive", operations.ledger_derive),
     ("GET", "/api/audit", handlers.audit),
     ("GET", "/api/audit/summary", handlers.audit_summary),
     ("POST", "/api/audit/clear", operations.audit_clear),
@@ -141,6 +156,10 @@ ROUTES: tuple[tuple[str, str, Handler], ...] = (
 
 def status_for(error: ContractError) -> int:
     """Map a contract violation onto a response status."""
+    if isinstance(error, RevertAckMismatchError):
+        return 412
+    if isinstance(error, LedgerTamperedError):
+        return 500
     if isinstance(error, CONFLICT):
         return 409
     if isinstance(error, MALFORMED):

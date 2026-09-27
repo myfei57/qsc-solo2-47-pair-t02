@@ -15,6 +15,47 @@ def confirmation_issue(console: Any, request: Request) -> Response:
     return json_response(confirmation.to_row())
 
 
+def ledger_publish(console: Any, request: Request) -> Response:
+    """Record a new process parameter revision and what it was based on."""
+    body = request.body()
+    revision = console.services.ledger.publish(
+        body["name"],
+        dict(body["values"]),
+        body["reason"],
+        body["operator"],
+        based_on=(int(body["based_on"]) if body.get("based_on") is not None else None),
+    )
+    return json_response(revision.to_row())
+
+
+def ledger_revert(console: Any, request: Request) -> Response:
+    """Reinstate an older revision as a new revision after impact acknowledgement."""
+    body = request.body()
+    revision = console.services.ledger.revert(
+        body["name"],
+        int(body["sequence"]),
+        body["reason"],
+        body["operator"],
+        body["ack"],
+    )
+    return json_response(revision.to_row())
+
+
+def ledger_derive(console: Any, request: Request) -> Response:
+    """Record that something was generated under the revision currently in force."""
+    body = request.body()
+    ledger = console.services.ledger
+    current = ledger.current(body["name"])
+    entry = ledger.derivations.record(
+        ledger,
+        body["name"],
+        current,
+        body["kind"],
+        body.get("detail", ""),
+    )
+    return json_response(entry.to_row())
+
+
 def journal_advance_tick(console: Any, request: Request) -> Response:
     body = request.body()
     tick = console.services.clock.advance(int(body.get("steps", 1)))

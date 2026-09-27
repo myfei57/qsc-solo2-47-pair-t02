@@ -56,6 +56,7 @@ def test_pages_are_named_and_served(console):
         "index.html",
         "operations.html",
         "curves.html",
+        "ledger.html",
         "audit.html",
     }
     for name in page_names():

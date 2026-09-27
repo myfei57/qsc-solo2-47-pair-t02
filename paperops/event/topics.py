@@ -33,6 +33,10 @@ TOPIC_WATER_SAMPLE = "water.sample.added"
 
 TOPIC_SNAPSHOT = "state.snapshot"
 
+TOPIC_LEDGER_PUBLISHED = "ledger.revision.published"
+TOPIC_LEDGER_REVERTED = "ledger.revision.reverted"
+TOPIC_LEDGER_DERIVATION_VOIDED = "ledger.derivation.voided"
+
 ALL_TOPICS: tuple[str, ...] = (
     TOPIC_DEWATER_PERSISTED,
     TOPIC_PRESS_LOAD,
@@ -58,4 +62,7 @@ ALL_TOPICS: tuple[str, ...] = (
     TOPIC_WATER_PROFILE,
     TOPIC_WATER_SAMPLE,
     TOPIC_SNAPSHOT,
+    TOPIC_LEDGER_PUBLISHED,
+    TOPIC_LEDGER_REVERTED,
+    TOPIC_LEDGER_DERIVATION_VOIDED,
 )

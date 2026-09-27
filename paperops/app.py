@@ -12,6 +12,7 @@ from .console.router import Console
 from .dry import DryService
 from .event import EventBus
 from .glue import GlueService
+from .ledger import DerivationRegistry, ParameterLedger
 from .press import PressService
 from .reel import ReelService
 from .state import StateService
@@ -33,6 +34,7 @@ class Services:
     generations: Generations
     confirmations: Confirmations
     artifacts: Artifacts
+    ledger: ParameterLedger
     batches: BatchRegistry
     press: PressService
     dry: DryService
@@ -66,6 +68,14 @@ def build_services(config: Config) -> Services:
     generations = Generations(journal)
     confirmations = Confirmations(journal, clock, IdSequence("cfm"), generations)
     artifacts = Artifacts(journal, clock)
+    ledger = ParameterLedger(
+        journal,
+        bus,
+        clock,
+        generations,
+        confirmations=confirmations,
+        derivations=DerivationRegistry(journal, clock),
+    )
     batches = BatchRegistry(journal)
 
     press = PressService(journal, bus, clock, generations, confirmations)
@@ -110,6 +120,7 @@ def build_services(config: Config) -> Services:
         generations=generations,
         confirmations=confirmations,
         artifacts=artifacts,
+        ledger=ledger,
         batches=batches,
         press=press,
         dry=dry,

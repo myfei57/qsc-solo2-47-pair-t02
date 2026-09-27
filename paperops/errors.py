@@ -75,3 +75,19 @@ class OutOfRangeError(ContractError):
 
 class UnknownSensorError(ContractError):
     """Raised when a moisture sensor is addressed before it is mapped."""
+
+
+class UnknownRevisionError(ContractError):
+    """Raised when a revision identifier or sequence cannot be found in the ledger."""
+
+
+class RevisionConflictError(ContractError):
+    """Raised when a change is based on a revision that has already been superseded."""
+
+
+class LedgerTamperedError(ContractError):
+    """Raised when the immutable revision history fails its digest chain."""
+
+
+class RevertAckMismatchError(ContractError):
+    """Raised when a revert does not carry the digest of the impact report it saw."""
