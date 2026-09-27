@@ -57,6 +57,7 @@ def test_pages_are_named_and_served(console):
         "operations.html",
         "curves.html",
         "audit.html",
+        "lineage.html",
     }
     for name in page_names():
         response = call(console, "GET", "/" + name)

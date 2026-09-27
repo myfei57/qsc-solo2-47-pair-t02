@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>代际账</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #0f1720; color: #dfe7ef; }
+    h1 { font-size: 20px; margin: 0 0 16px; }
+    h2 { font-size: 15px; margin: 22px 0 10px; color: #9fb3c8; }
+    nav a { color: #7fc4ff; margin-right: 14px; text-decoration: none; }
+    .card { background: #18222e; border: 1px solid #26333f; border-radius: 8px; padding: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+    th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #26333f; vertical-align: top; }
+    button, select, input { background: #101a24; color: #dfe7ef; border: 1px solid #2c3e50; border-radius: 5px; padding: 5px 9px; font-size: 13px; }
+    button { cursor: pointer; }
+    button:hover { border-color: #7fc4ff; }
+    .tag { display: inline-block; border-radius: 4px; padding: 1px 7px; font-size: 12px; }
+    .edit { background: #1d3b5a; color: #9cd0ff; }
+    .rollback { background: #5a2d2d; color: #ffb3a8; }
+    .live { background: #1e4633; color: #8fe6b8; }
+    .voided { background: #4a2c2c; color: #e0a0a0; text-decoration: line-through; }
+    .current { color: #8fe6b8; font-weight: 600; }
+    pre { background: #101a24; padding: 10px; border-radius: 6px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
+    #banner { margin: 10px 0; padding: 8px 12px; border-radius: 6px; display: none; }
+    #banner.warn { display: block; background: #4a2c2c; color: #ffd6d0; }
+    #banner.ok { display: block; background: #1e4633; color: #bff0d6; }
+    .muted { color: #74899c; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>代际账 · 工艺参数血缘</h1>
+  <nav>
+    <a href="/">总览</a>
+    <a href="/operations.html">操作</a>
+    <a href="/curves.html">曲线</a>
+    <a href="/audit.html">记录</a>
+    <a href="/lineage.html">代际账</a>
+  </nav>
+  <div id="banner"></div>
+
+  <div class="grid" id="cards"></div>
+
+  <h2 id="detailTitle">选择一个参数集</h2>
+  <div class="card">
+    <div id="detail" class="muted">左侧列出所有有版本的参数集，点击查看它的代际链、分支与产出物。</div>
+  </div>
+
+  <script>
+    const api = async (path, options) => {
+      const response = await fetch(path, options);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || ("HTTP " + response.status));
+      return body;
+    };
+    const banner = (text, kind) => {
+      const el = document.getElementById("banner");
+      el.textContent = text;
+      el.className = kind;
+    };
+    const clearBanner = () => { document.getElementById("banner").className = ""; };
+
+    async function refresh() {
+      const report = await api("/api/lineage");
+      const cards = document.getElementById("cards");
+      cards.innerHTML = "";
+      for (const item of report.parameters) {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.style.cursor = "pointer";
+        card.innerHTML =
+          `<h2>${item.name}</h2>` +
+          `<div class="current">当前 ${item.current_revision_id}</div>` +
+          `<div class="muted">版本 ${item.revisions} · 生效产出 ${item.live_outputs} · 已作废 ${item.voided_outputs}</div>`;
+        card.onclick = () => showLineage(item.name);
+        cards.appendChild(card);
+      }
+      document.getElementById("cards").dataset.tail = report.tail_hash;
+    }
+
+    async function showLineage(name) {
+      clearBanner();
+      const [data, all] = await Promise.all([
+        api("/api/lineage/history?name=" + encodeURIComponent(name)),
+        api("/api/lineage/outputs?name=" + encodeURIComponent(name)),
+      ]);
+      document.getElementById("detailTitle").textContent = name;
+      const byRevision = {};
+      for (const out of all.outputs) (byRevision[out.revision_id] ||= []).push(out);
+
+      const rows = data.chain.map((rev, idx) => revisionRow(rev, idx, byRevision, false)).join("");
+      const branchRows = data.branches
+        .map((rev) => revisionRow(rev, null, byRevision, true)).join("");
+
+      const options = data.chain
+        .filter((rev) => rev.revision_id !== data.current.revision_id)
+        .map((rev) => `<option value="${rev.revision_id}">${rev.revision_id} — ${rev.reason}</option>`)
+        .join("");
+
+      document.getElementById("detail").innerHTML = `
+        <div>当前版本：<span class="current">${data.current.revision_id}</span>
+          <span class="muted">改因：${escapeHtml(data.current.reason)}</span></div>
+        <table><thead><tr><th>链序</th><th>版本</th><th>来源</th><th>改动类型</th><th>参数</th><th>原因 / 操作</th><th>本版产出</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+        ${branchRows ? `<h2>未生效分支</h2><table><tbody>${branchRows}</tbody></table>` : ""}
+        <h2>退回旧版</h2>
+        <div class="muted">退回不会删历史：系统会再出一个新版本，参数与所选旧版相同。提交前请先看影响清单并确认。</div>
+        <div style="margin-top:8px">
+          <select id="target">${options}</select>
+          <input id="rollbackReason" placeholder="退回原因（必填）" style="width:260px">
+          <button onclick="planRollback('${escapeAttr(name)}')">① 出影响清单</button>
+          <button onclick="commitRollback('${escapeAttr(name)}')">② 确认退回</button>
+        </div>
+        <pre id="plan"></pre>`;
+    }
+
+    function revisionRow(rev, idx, byRevision, isBranch) {
+      const kindTag = rev.change_kind === "rollback"
+        ? `<span class="tag rollback">退回</span>`
+        : `<span class="tag edit">修改</span>`;
+      const kindNote = rev.change_kind === "rollback" ? `恢复自 ${rev.rollback_of}；` : "";
+      const outputs = (byRevision[rev.revision_id] || []).map((out) =>
+        `<div><span class="tag ${out.status}">${out.status === "live" ? "生效" : "已作废"}</span>
+         ${escapeHtml(out.output_id)} <span class="muted">${escapeHtml(out.kind)}</span></div>`
+      ).join("") || `<span class="muted">无</span>`;
+      return `<tr>
+        <td>${isBranch ? "分支" : idx}</td>
+        <td>${rev.revision_id}${isBranch ? "" : ""}</td>
+        <td>${rev.parent_id || "—"}</td>
+        <td>${kindTag}</td>
+        <td><pre>${escapeHtml(JSON.stringify(rev.parameters, null, 0))}</pre></td>
+        <td>${kindNote}${escapeHtml(rev.reason)}<div class="muted">${escapeHtml(rev.actor)} @ tick ${rev.tick}</div></td>
+        <td>${outputs}</td>
+      </tr>`;
+    }
+
+    let lastPlan = null;
+    async function planRollback(name) {
+      try {
+        const target = document.getElementById("target").value;
+        const reason = document.getElementById("rollbackReason").value;
+        lastPlan = await api("/api/lineage/rollback/plan", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({name, target_revision_id: target, reason}),
+        });
+        document.getElementById("plan").textContent = JSON.stringify(lastPlan, null, 2);
+        banner("影响清单已生成：确认作废清单无误后，再点②确认退回。", "ok");
+      } catch (error) { banner(error.message, "warn"); }
+    }
+
+    async function commitRollback(name) {
+      if (!lastPlan) return banner("请先生成影响清单（①）。", "warn");
+      try {
+        const target = lastPlan.plan.target_revision_id;
+        const reason = lastPlan.plan.reason;
+        await api("/api/lineage/rollback/commit", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({name, target_revision_id: target, reason, digest: lastPlan.digest}),
+        });
+        lastPlan = null;
+        banner("已退回，新版本已发布，列名产出已作废。", "ok");
+        await refresh();
+        await showLineage(name);
+      } catch (error) { banner(error.message, "warn"); }
+    }
+
+    const escapeHtml = (text) => String(text ?? "").replace(/[&<>"']/g, (c) =>
+      ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+    const escapeAttr = escapeHtml;
+
+    refresh().catch((error) => banner(error.message, "warn"));
+    setInterval(() => { refresh().catch(() => {}); }, 5000);
+  </script>
+</body>
+</html>

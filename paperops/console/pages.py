@@ -9,6 +9,7 @@ PAGE_NAMES: tuple[str, ...] = (
     "operations.html",
     "curves.html",
     "audit.html",
+    "lineage.html",
 )
 
 

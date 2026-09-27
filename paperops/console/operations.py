@@ -272,3 +272,54 @@ def water_reading(console: Any, request: Request) -> Response:
 
 def water_profile(console: Any, request: Request) -> Response:
     return json_response(console.services.water.record_profile())
+
+
+# --------------------------------------------------------------- generation ledger
+
+
+def lineage_revise(console: Any, request: Request) -> Response:
+    body = request.body()
+    revision = console.services.lineage.revise(
+        name=body["name"],
+        parameters=body["parameters"],
+        reason=body["reason"],
+        actor=body.get("actor", "operator"),
+        parent_id=body.get("parent_id"),
+    )
+    return json_response(revision.to_row())
+
+
+def lineage_output(console: Any, request: Request) -> Response:
+    body = request.body()
+    output = console.services.lineage.register_output(
+        output_id=body["output_id"],
+        revision_id=body["revision_id"],
+        kind=body["kind"],
+        detail=body.get("detail", {}),
+        actor=body.get("actor", "operator"),
+    )
+    return json_response(output.to_row())
+
+
+def lineage_rollback_plan(console: Any, request: Request) -> Response:
+    body = request.body()
+    return json_response(
+        console.services.lineage.rollback_plan(
+            name=body["name"],
+            target_id=body["target_revision_id"],
+            reason=body["reason"],
+        )
+    )
+
+
+def lineage_rollback_commit(console: Any, request: Request) -> Response:
+    body = request.body()
+    return json_response(
+        console.services.lineage.commit_rollback(
+            name=body["name"],
+            target_id=body["target_revision_id"],
+            reason=body["reason"],
+            digest=body["digest"],
+            actor=body.get("actor", "operator"),
+        )
+    )

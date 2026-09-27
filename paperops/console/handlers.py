@@ -403,3 +403,32 @@ def water_model(console: Any, request: Request) -> Response:
 def page(console: Any, request: Request) -> Response:
     name = request.path.lstrip("/") or "index.html"
     return read_page(console.services.config.web_dir, name)
+
+
+# --------------------------------------------------------------- generation ledger
+
+
+def lineage_report(console: Any, request: Request) -> Response:
+    return json_response(console.services.lineage.report())
+
+
+def lineage_history(console: Any, request: Request) -> Response:
+    return json_response(console.services.lineage.lineage(request.param("name")))
+
+
+def lineage_revision(console: Any, request: Request) -> Response:
+    revision = console.services.lineage.require_revision(request.param("id"))
+    return json_response(revision.to_row())
+
+
+def lineage_outputs(console: Any, request: Request) -> Response:
+    outputs = console.services.lineage.outputs(
+        name=request.param("name"),
+        revision_id=request.param("revision"),
+        status=request.param("status"),
+    )
+    return json_response({"outputs": [output.to_row() for output in outputs]})
+
+
+def lineage_verify(console: Any, request: Request) -> Response:
+    return json_response(console.services.lineage.verify())

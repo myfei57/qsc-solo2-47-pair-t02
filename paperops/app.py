@@ -12,6 +12,7 @@ from .console.router import Console
 from .dry import DryService
 from .event import EventBus
 from .glue import GlueService
+from .lineage import LineageLog, LineageService
 from .press import PressService
 from .reel import ReelService
 from .state import StateService
@@ -44,6 +45,7 @@ class Services:
     water: WaterService
     audit: AuditService
     state: StateService
+    lineage: LineageService
     console: Any = None
 
     def reload(self) -> None:
@@ -67,6 +69,8 @@ def build_services(config: Config) -> Services:
     confirmations = Confirmations(journal, clock, IdSequence("cfm"), generations)
     artifacts = Artifacts(journal, clock)
     batches = BatchRegistry(journal)
+    lineage_log = LineageLog(config.data_dir)
+    lineage = LineageService(lineage_log, clock, bus)
 
     press = PressService(journal, bus, clock, generations, confirmations)
     steam = SteamService(journal, bus, clock, generations, confirmations)
@@ -121,6 +125,7 @@ def build_services(config: Config) -> Services:
         water=water,
         audit=audit,
         state=state,
+        lineage=lineage,
     )
     services.reload()
     dry.wire()

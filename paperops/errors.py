@@ -75,3 +75,23 @@ class OutOfRangeError(ContractError):
 
 class UnknownSensorError(ContractError):
     """Raised when a moisture sensor is addressed before it is mapped."""
+
+
+class UnknownRevisionError(ContractError):
+    """Raised when a revision or parameter name is not in the generation ledger."""
+
+
+class UnknownOutputError(ContractError):
+    """Raised when a produced artifact is not in the generation ledger."""
+
+
+class RevisionNotAncestorError(ContractError):
+    """Raised when a rollback target is not on the ancestry chain of the current revision."""
+
+
+class RollbackPlanMismatchError(ContractError):
+    """Raised when a rollback confirmation digest does not match the current plan."""
+
+
+class LedgerIntegrityError(ContractError):
+    """Raised when the generation ledger hash chain has been altered."""

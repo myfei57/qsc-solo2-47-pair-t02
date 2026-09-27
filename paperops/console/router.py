@@ -11,15 +11,20 @@ from ..errors import (
     DuplicateStageError,
     LatchClearError,
     LatchSetError,
+    LedgerIntegrityError,
     MaintenanceError,
     OutOfRangeError,
     OutOfSequenceError,
     PreGateError,
+    RevisionNotAncestorError,
     RollbackError,
+    RollbackPlanMismatchError,
     StaleArtifactError,
     UnknownBatchError,
     UnknownConfirmationError,
     UnknownKeyError,
+    UnknownOutputError,
+    UnknownRevisionError,
     UnknownSensorError,
     UnknownStageError,
 )
@@ -38,6 +43,8 @@ CONFLICT = (
     DuplicateBatchError,
     StaleArtifactError,
     RollbackError,
+    RevisionNotAncestorError,
+    RollbackPlanMismatchError,
     CommitOrderError,
 )
 MALFORMED = (OutOfRangeError, UnknownStageError, ConfirmationMismatchError)
@@ -47,6 +54,8 @@ MISSING = (
     UnknownBatchError,
     BatchNotPendingError,
     UnknownSensorError,
+    UnknownRevisionError,
+    UnknownOutputError,
 )
 
 ROUTES: tuple[tuple[str, str, Handler], ...] = (
@@ -134,6 +143,15 @@ ROUTES: tuple[tuple[str, str, Handler], ...] = (
     ("POST", "/api/water/sample", operations.water_sample),
     ("POST", "/api/water/reading", operations.water_reading),
     ("POST", "/api/water/profile", operations.water_profile),
+    ("GET", "/api/lineage", handlers.lineage_report),
+    ("GET", "/api/lineage/history", handlers.lineage_history),
+    ("GET", "/api/lineage/revision", handlers.lineage_revision),
+    ("GET", "/api/lineage/outputs", handlers.lineage_outputs),
+    ("GET", "/api/lineage/verify", handlers.lineage_verify),
+    ("POST", "/api/lineage/revise", operations.lineage_revise),
+    ("POST", "/api/lineage/output", operations.lineage_output),
+    ("POST", "/api/lineage/rollback/plan", operations.lineage_rollback_plan),
+    ("POST", "/api/lineage/rollback/commit", operations.lineage_rollback_commit),
 ) + ((("GET", "/", handlers.page),) + tuple(
     ("GET", "/" + name, handlers.page) for name in page_names()
 ))
@@ -149,6 +167,8 @@ def status_for(error: ContractError) -> int:
         return 404
     if isinstance(error, MaintenanceError):
         return 503
+    if isinstance(error, LedgerIntegrityError):
+        return 500
     return 400
 
 

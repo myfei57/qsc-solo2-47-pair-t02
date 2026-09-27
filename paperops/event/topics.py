@@ -33,6 +33,10 @@ TOPIC_WATER_SAMPLE = "water.sample.added"
 
 TOPIC_SNAPSHOT = "state.snapshot"
 
+TOPIC_LINEAGE_REVISION = "lineage.revision.published"
+TOPIC_LINEAGE_OUTPUT = "lineage.output.registered"
+TOPIC_LINEAGE_OUTPUT_VOID = "lineage.output.voided"
+
 ALL_TOPICS: tuple[str, ...] = (
     TOPIC_DEWATER_PERSISTED,
     TOPIC_PRESS_LOAD,
@@ -58,4 +62,7 @@ ALL_TOPICS: tuple[str, ...] = (
     TOPIC_WATER_PROFILE,
     TOPIC_WATER_SAMPLE,
     TOPIC_SNAPSHOT,
+    TOPIC_LINEAGE_REVISION,
+    TOPIC_LINEAGE_OUTPUT,
+    TOPIC_LINEAGE_OUTPUT_VOID,
 )
